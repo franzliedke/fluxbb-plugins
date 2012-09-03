@@ -94,6 +94,8 @@ if (isset($_POST['process_form']))
 		list($full_name, $username, $email) = array_map('trim', explode(',', $line));
 
 		// Validate username, this automatically populates the $errors array
+		include_once PUN_ROOT.'lang/'.$pun_user['language'].'/register.php';
+		include_once PUN_ROOT.'lang/'.$pun_user['language'].'/prof_reg.php';
 		check_username($username);
 
 		// Validate email
@@ -124,7 +126,7 @@ if (isset($_POST['process_form']))
 	$now = time();
 	foreach ($new_users as $cur_user)
 	{
-		$password = random_key(6);
+		$password = random_key(6, true);
 		$password_hash = pun_hash($password);
 
 		$initial_group_id = ($pun_config['o_regs_verify'] == '0') ? $pun_config['o_default_user_group'] : PUN_UNVERIFIED;
@@ -136,8 +138,23 @@ if (isset($_POST['process_form']))
 		$db->query('INSERT INTO '.$db->prefix.'users (username, group_id, password, email, email_setting, language, style, registered, registration_ip, last_visit) VALUES (\''.$db->escape($cur_user['username']).'\', '.$initial_group_id.', \''.$password_hash.'\', \''.$db->escape($email).'\', '.$email_setting.', \''.$db->escape($language).'\', \''.$pun_config['o_default_style'].'\', '.$now.', \''.get_remote_address().'\', '.$now.')') or error('Unable to create user', __FILE__, __LINE__, $db->error());
 
 		// Send them a notification email so they now they've been registered
-		// FIXME
-		//pun_mail('foo');
+		$to = $cur_user['email'];
+		$subject = 'Your account information';
+		$mail = <<<EOT
+Hello {$cur_user['full_name']}, an account was created for you at the forums at {$pun_config['o_base_url']}.
+
+Your username is {$cur_user['username']}.
+Your password was set to {$password}.
+
+Please login using this information and change your password immediately.
+
+Have fun using the forums!
+
+---
+This is an automatically generated email. Please do not reply.
+EOT;
+
+		pun_mail($to, $subject, $mail);
 	}
 
 	redirect('admin_loader.php?plugin=AP_Mass_create_users.php', 'Users created successfully. Redirecting...');
