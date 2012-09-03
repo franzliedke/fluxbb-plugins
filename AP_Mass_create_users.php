@@ -4,6 +4,7 @@
  * User mass creation plugin for FluxBB
  * 
  * Created by Franz Liedke
+ * Plugin sponsored by ximios.com
  */
 
 // Make sure no one attempts to run this script "directly"
