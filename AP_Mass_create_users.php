@@ -1,0 +1,255 @@
+<?php
+
+/**
+ * User mass creation plugin for FluxBB
+ * 
+ * Created by Franz Liedke
+ */
+
+// Make sure no one attempts to run this script "directly"
+if (!defined('PUN'))
+	exit;
+
+// Tell admin_loader.php that this is indeed a plugin and that it is loaded
+define('PUN_PLUGIN_LOADED', 1);
+
+
+// Upload a file
+if (isset($_POST['process_form']))
+{
+	if (!isset($_FILES['users_file']))
+		message('You did not select a file for upload.');
+
+	$uploaded_file = $_FILES['users_file'];
+
+	// Make sure the upload went smooth
+	if (isset($uploaded_file['error']))
+	{
+		switch ($uploaded_file['error'])
+		{
+			case 1: // UPLOAD_ERR_INI_SIZE
+			case 2: // UPLOAD_ERR_FORM_SIZE
+				message('The selected file was too large to upload. The server didn\'t allow the upload.');
+				break;
+
+			case 3: // UPLOAD_ERR_PARTIAL
+				message('The selected file was only partially uploaded. Please try again.');
+				break;
+
+			case 4: // UPLOAD_ERR_NO_FILE
+				message('You did not select a file for upload.');
+				break;
+
+			case 6: // UPLOAD_ERR_NO_TMP_DIR
+				message('PHP was unable to save the uploaded file to a temporary location.');
+				break;
+
+			default:
+				// No error occured, but was something actually uploaded?
+				if ($uploaded_file['size'] == 0)
+					message('You did not select a file for upload.');
+				break;
+		}
+	}
+
+	if (is_uploaded_file($uploaded_file['tmp_name']))
+	{
+		// Preliminary file check, adequate in most cases
+		if ($uploaded_file['type'] != 'text/plain')
+			message('The file you tried to upload does not seem to be a text file.');
+
+		$extension = pathinfo($uploaded_file['name'], PATHINFO_EXTENSION);
+		if ($extension != 'txt')
+			message('The file you tried to upload is not a TXT file.');
+
+		// Make sure the file isn't too big
+		if ($uploaded_file['size'] > 524288) // 512 KiB
+			message('The file you tried to upload is larger than the maximum allowed '.file_size(524288).'.');
+
+		// Move the file to the upload directory
+		$file_name = PUN_ROOT.'_process_/'.date('Y-m-d.H.m.s').'.txt';
+		if (!@move_uploaded_file($uploaded_file['tmp_name'], $file_name))
+			message('The server was unable to save the uploaded file.');
+
+		@chmod($file_name, 0644);
+	}
+	else
+		message('An unknown error occurred. Please try again.');
+
+	// Try to extract the user information from the file
+	$new_users = $usernames = array();
+	$errors = array();
+	foreach (file($file_name) as $line_number => $line)
+	{
+		$line = trim($line);
+
+		if (empty($line))
+			continue;
+
+		$line_number++;
+		if (substr_count($line, ',') != 2)
+			message('The file format does not seem to be correct. Error in line: '.$line_number);
+
+		list($full_name, $username, $email) = array_map('trim', explode(',', $line));
+
+		// Validate username, this automatically populates the $errors array
+		check_username($username);
+
+		// Validate email
+		include_once PUN_ROOT.'include/email.php';
+		if (!is_valid_email($email))
+			$errors[] = 'The email "'.pun_htmlspecialchars($email).'" does not seem to be valid. Error in line: '.$line_number;
+		else if (is_banned_email($email))
+			$erros[] = 'The email "'.pun_htmlspecialchars($email).'" was banned in the system. Error in line: '.$line_number;
+
+		$new_users[] = compact('full_name', 'username', 'email');
+		$usernames[] = $username;
+	}
+
+	// Make sure we don't try to insert duplicate usernames
+	$new_user_count = count($usernames);
+	if ($new_user_count == 0)
+		message('No new users found in the file.');
+	if (count(array_unique($usernames)) < $new_user_count)
+		$errors[] = 'The file contains multiple users with the same username.';
+
+	if (!empty($errors))
+	{
+		@unlink($file_name);
+		message('The following errors occured:'."\n".'<ul><li>'.implode('</li><li>', $errors).'</li></ul>');
+	}
+
+	// And now, insert the users!
+	$now = time();
+	foreach ($new_users as $cur_user)
+	{
+		$password = random_key(6);
+		$password_hash = pun_hash($password);
+
+		$initial_group_id = ($pun_config['o_regs_verify'] == '0') ? $pun_config['o_default_user_group'] : PUN_UNVERIFIED;
+
+		$email_setting = $pun_config['o_default_email_setting'];
+		$language = $pun_config['o_default_lang'];
+
+		// Save them in the database
+		$db->query('INSERT INTO '.$db->prefix.'users (username, group_id, password, email, email_setting, language, style, registered, registration_ip, last_visit) VALUES (\''.$db->escape($cur_user['username']).'\', '.$initial_group_id.', \''.$password_hash.'\', \''.$db->escape($email).'\', '.$email_setting.', \''.$db->escape($language).'\', \''.$pun_config['o_default_style'].'\', '.$now.', \''.get_remote_address().'\', '.$now.')') or error('Unable to create user', __FILE__, __LINE__, $db->error());
+
+		// Send them a notification email so they now they've been registered
+		// FIXME
+		//pun_mail('foo');
+	}
+
+	redirect('admin_loader.php?plugin=AP_Mass_create_users.php', 'Users created successfully. Redirecting...');
+}
+else if (isset($_GET['file']))
+{
+	$filename = trim($_GET['file']);
+	$filepath = PUN_ROOT.'_process_/'.$filename;
+
+	$all_files = array_map('basename', glob(PUN_ROOT.'_process_/*.txt'));
+
+	if (!in_array($filename, $all_files))
+		exit('Bad request');
+
+	if (isset($_GET['view']))
+	{
+		$contents = file_get_contents($filepath);
+
+		header('Content-Type: text/plain');
+		echo $contents;
+		exit;
+	}
+	else if (isset($_GET['download']))
+	{
+		header('Content-Disposition: attachment; filename="'.$filename.'"');
+		header('Content-Type: application/force-download');
+		header('Content-Length: '.filesize($filepath));
+		header('Connection: close');
+		readfile($filepath);
+		exit;
+	}
+	else if (isset($_GET['delete']))
+	{
+		@unlink($filepath);
+
+		redirect('admin_loader.php?plugin=AP_Mass_create_users.php', 'File deleted successfully. Redirecting...');
+	}
+}
+
+
+// Display the admin navigation menu
+generate_admin_menu($plugin);
+
+?>
+
+	<div class="blockform">
+		<h2><span>Mass Create Users</span></h2>
+		<div class="box">
+			<form id="mcu" method="post" action="<?php echo $_SERVER['REQUEST_URI'] ?>" enctype="multipart/form-data">
+				<div class="inform">
+					<fieldset>
+						<legend>Add New Users</legend>
+						<div class="infldset upload_file">
+							<p>
+								Provide a .txt file to mass create users in the system. Each line in the .txt file must be formatted as follows: 
+								<code>full name,username,email</code>.
+							</p>
+							<p>
+								Example:
+<pre>Mary Smith,msmith95,msmith@aol.com
+John Kennedy,jkennedy,jkeneddy@aol.com</pre>
+							</p>
+							<hr />
+
+                            File: <input type="file" name="users_file" /> <P>
+                            <input type="submit" name="process_form" value="Process" />
+
+  						</div>
+					</fieldset>
+				</div>
+				<div class="inform">
+					<fieldset>
+						<legend>Processed Files:</legend>
+						<div class="infldset">
+
+							<table cellspacing="0" >
+							<thead>
+								<tr>
+									<th class="tcl" scope="col">File Name</th>
+									<th class="tc2" scope="col"></th>
+									<th class="tc3" scope="col"></th>
+									<th class="tc4" scope="col"></th>
+								</tr>
+							</thead>
+
+							<tbody>
+
+<?php
+
+foreach (glob(PUN_ROOT.'_process_/*.txt') as $filename)
+{
+	$filename = htmlspecialchars(basename($filename));
+
+?>
+								<tr>
+									<th class="tcl" scope="col"><?php echo $filename; ?></th>
+									<th class="tc2" scope="col"><a href="<?php echo $_SERVER['REQUEST_URI'].'&amp;file='.$filename.'&amp;view' ?>">View</a></th>
+									<th class="tc3" scope="col"><a href="<?php echo $_SERVER['REQUEST_URI'].'&amp;file='.$filename.'&amp;download' ?>">Download</a></th>
+									<th class="tc4" scope="col"><a href="<?php echo $_SERVER['REQUEST_URI'].'&amp;file='.$filename.'&amp;delete' ?>">Delete</a></th>
+								</tr>
+<?php
+
+}
+
+?>
+
+							</tbody>
+							</table>
+
+
+						</div>
+					</fieldset>
+				</div>
+			</form>
+		</div> 
+	</div>
