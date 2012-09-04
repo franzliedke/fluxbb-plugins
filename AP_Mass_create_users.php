@@ -87,7 +87,7 @@ if (isset($_POST['process_form']))
 		message('An unknown error occurred. Please try again.');
 
 	// Try to extract the user information from the file
-	$new_users = $usernames = array();
+	$new_users = $usernames = $emails = array();
 	$errors = array();
 	foreach (file($file_name) as $line_number => $line)
 	{
@@ -116,6 +116,7 @@ if (isset($_POST['process_form']))
 
 		$new_users[] = compact('full_name', 'username', 'email');
 		$usernames[] = $username;
+		$emails[] = $email;
 	}
 
 	// Make sure we don't try to insert duplicate usernames
@@ -124,6 +125,8 @@ if (isset($_POST['process_form']))
 		message('No new users found in the file.');
 	if (count(array_unique($usernames)) < $new_user_count)
 		$errors[] = 'The file contains multiple users with the same username.';
+	if (count(array_unique($emails)) < $new_user_count)
+		$errors[] = 'The file contains multiple users with the same email address.';
 
 	if (!empty($errors))
 	{
