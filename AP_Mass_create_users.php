@@ -290,9 +290,16 @@ John Kennedy,jkennedy,jkeneddy@aol.com</pre>
 
 <?php
 
+$all_files = array();
 foreach (glob(PUN_ROOT.'_process_/*.txt') as $filename)
 {
-	$filename = htmlspecialchars(basename($filename));
+	$all_files[] = htmlspecialchars(basename($filename));
+}
+
+$all_files = array_reverse($all_files);
+
+foreach ($all_files as $filename)
+{
 
 ?>
 								<tr>
