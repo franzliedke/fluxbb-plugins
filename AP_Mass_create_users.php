@@ -135,7 +135,7 @@ if (isset($_POST['process_form']))
 		$language = $pun_config['o_default_lang'];
 
 		// Save them in the database
-		$db->query('INSERT INTO '.$db->prefix.'users (username, group_id, password, email, email_setting, language, style, registered, registration_ip, last_visit) VALUES (\''.$db->escape($cur_user['username']).'\', '.$initial_group_id.', \''.$password_hash.'\', \''.$db->escape($cur_user['email']).'\', '.$email_setting.', \''.$db->escape($language).'\', \''.$pun_config['o_default_style'].'\', '.$now.', \''.get_remote_address().'\', '.$now.')') or error('Unable to create user', __FILE__, __LINE__, $db->error());
+		$db->query('INSERT INTO '.$db->prefix.'users (username, group_id, password, email, realname, email_setting, language, style, registered, registration_ip, last_visit) VALUES (\''.$db->escape($cur_user['username']).'\', '.$initial_group_id.', \''.$password_hash.'\', \''.$db->escape($cur_user['email']).'\', \''.$db->escape($cur_user['full_name']).'\' '.$email_setting.', \''.$db->escape($language).'\', \''.$pun_config['o_default_style'].'\', '.$now.', \''.get_remote_address().'\', '.$now.')') or error('Unable to create user', __FILE__, __LINE__, $db->error());
 
 		// Send them a notification email so they now they've been registered
 		$to = $cur_user['email'];
