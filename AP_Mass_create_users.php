@@ -304,7 +304,7 @@ foreach ($all_files as $filename)
 ?>
 								<tr>
 									<th class="tcl" scope="col"><?php echo $filename; ?></th>
-									<th class="tc2" scope="col"><a href="<?php echo $_SERVER['REQUEST_URI'].'&amp;file='.$filename.'&amp;view' ?>">View</a></th>
+									<th class="tc2" scope="col"><a href="<?php echo $_SERVER['REQUEST_URI'].'&amp;file='.$filename.'&amp;view' ?>" target="blank">View</a></th>
 									<th class="tc3" scope="col"><a href="<?php echo $_SERVER['REQUEST_URI'].'&amp;file='.$filename.'&amp;download' ?>">Download</a></th>
 									<th class="tc4" scope="col"><a href="<?php echo $_SERVER['REQUEST_URI'].'&amp;file='.$filename.'&amp;delete' ?>">Delete</a></th>
 								</tr>
