@@ -119,7 +119,7 @@ if (isset($_POST['process_form']))
 		$emails[] = $email;
 	}
 
-	// Make sure we don't try to insert duplicate usernames
+	// Make sure we don't try to insert duplicate usernames or emails
 	$new_user_count = count($usernames);
 	if ($new_user_count == 0)
 		message('No new users found in the file.');
@@ -127,6 +127,23 @@ if (isset($_POST['process_form']))
 		$errors[] = 'The file contains multiple users with the same username.';
 	if (count(array_unique($emails)) < $new_user_count)
 		$errors[] = 'The file contains multiple users with the same email address.';
+
+	// Make sure the emails don't exist in the database
+	$escaped_emails = array();
+	foreach ($emails as $email)
+		$escaped_emails[] = '\''.$db->escape($email).'\'';
+	
+	$email_list = '('.implode(',', $escaped_emails).')';
+	$result = $db->query('SELECT * FROM '.$db->prefix.'users WHERE email IN '.$email_list) or error('Unable to fetch users with duplicate email addresses');
+
+	if ($db->num_rows($result))
+	{
+		$dupes = array();
+		while ($cur_dupe_user = $db->fetch_assoc($result))
+			$dupes[] = $cur_dupe_user['email'];
+
+		$errors[] = 'The file contains the following email addresses that already exist in the database: '.implode(', ', $dupes).'.';
+	}
 
 	if (!empty($errors))
 	{
