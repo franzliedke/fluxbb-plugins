@@ -15,6 +15,15 @@ if (!defined('PUN'))
 define('PUN_PLUGIN_LOADED', 1);
 
 
+// Fetch all valid groups
+$result = $db->query('SELECT * FROM '.$db->prefix.'groups WHERE g_id NOT IN ('.PUN_GUEST.','.PUN_UNVERIFIED.')') or error('Unable to fetch groups', __FILE__, __LINE__, $db->error());
+$all_groups = array();
+while ($cur_group = $db->fetch_assoc($result))
+{
+	$all_groups[$cur_group['g_id']] = $cur_group['g_title'];
+}
+
+
 // Upload a file
 if (isset($_POST['process_form']))
 {
@@ -129,7 +138,10 @@ if (isset($_POST['process_form']))
 		$password = random_key(6, true);
 		$password_hash = pun_hash($password);
 
-		$initial_group_id = ($pun_config['o_regs_verify'] == '0') ? $pun_config['o_default_user_group'] : PUN_UNVERIFIED;
+		if (isset($_POST['group']) && array_key_exists($_POST['group'], $all_groups))
+			$initial_group_id = $_POST['group'];
+		else
+			$initial_group_id = $pun_config['o_default_user_group'];
 
 		$email_setting = $pun_config['o_default_email_setting'];
 		$language = $pun_config['o_default_lang'];
@@ -217,14 +229,28 @@ generate_admin_menu($plugin);
 <pre>Mary Smith,msmith95,msmith@aol.com
 John Kennedy,jkennedy,jkeneddy@aol.com</pre>
 							</p>
-							<hr />
-
-                            File: <input type="file" name="users_file" /> <P>
-                            <input type="submit" name="process_form" value="Process" />
-
+							<table class="aligntop" cellspacing="0">
+								<tr>
+									<th scope="row">File</th>
+									<td>
+										<input type="file" name="users_file" />
+									</td>
+								</tr>
+								<tr>
+									<th scope="row">Group</th>
+									<td>
+										<select name="group">
+<?php foreach ($all_groups as $group_id => $group_name) : ?>
+											<option value="<?php echo $group_id; ?>"<?php if ($group_id == $pun_config['o_default_user_group']) echo ' selected="selected"' ?>><?php echo pun_htmlspecialchars($group_name); ?></option>
+<?php endforeach; ?>
+										</select>
+									</td>
+								</tr>
+							</table>
   						</div>
 					</fieldset>
 				</div>
+				<p class="submitend"><input type="submit" name="process_form" value="Process" /></p>
 				<div class="inform">
 					<fieldset>
 						<legend>Processed Files:</legend>
