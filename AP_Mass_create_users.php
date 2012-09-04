@@ -131,20 +131,20 @@ if (isset($_POST['process_form']))
 		message('The following errors occured:'."\n".'<ul><li>'.implode('</li><li>', $errors).'</li></ul>');
 	}
 
+	if (isset($_POST['group']) && array_key_exists($_POST['group'], $all_groups))
+		$initial_group_id = $_POST['group'];
+	else
+		$initial_group_id = $pun_config['o_default_user_group'];
+
+	$email_setting = $pun_config['o_default_email_setting'];
+	$language = $pun_config['o_default_lang'];
+
 	// And now, insert the users!
 	$now = time();
 	foreach ($new_users as $cur_user)
 	{
 		$password = random_key(6, true);
 		$password_hash = pun_hash($password);
-
-		if (isset($_POST['group']) && array_key_exists($_POST['group'], $all_groups))
-			$initial_group_id = $_POST['group'];
-		else
-			$initial_group_id = $pun_config['o_default_user_group'];
-
-		$email_setting = $pun_config['o_default_email_setting'];
-		$language = $pun_config['o_default_lang'];
 
 		// Save them in the database
 		$db->query('INSERT INTO '.$db->prefix.'users (username, group_id, password, email, realname, email_setting, language, style, registered, registration_ip, last_visit) VALUES (\''.$db->escape($cur_user['username']).'\', '.$initial_group_id.', \''.$password_hash.'\', \''.$db->escape($cur_user['email']).'\', \''.$db->escape($cur_user['full_name']).'\', '.$email_setting.', \''.$db->escape($language).'\', \''.$pun_config['o_default_style'].'\', '.$now.', \''.get_remote_address().'\', '.$now.')') or error('Unable to create user', __FILE__, __LINE__, $db->error());
